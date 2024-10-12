@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat de Soporte Técnico</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      background-color: #4CAF50;
+      color: white;
+      text-align: center;
+      padding: 10px 0;
+      margin: 0;
+    }
+    ul {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+    }
+    li {
+      padding: 8px;
+      margin-bottom: 10px;
+      background-color: #f4f4f4;
+      border-radius: 5px;
+    }
+    input {
+      padding: 10px;
+      width: 80%;
+      margin-right: 10px;
+    }
+    button {
+      padding: 10px;
+    }
+    .message {
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      border-bottom: 2px solid;
+    }
+    .username {
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 1.2em;
+    }
+    .timestamp {
+      font-size: 0.8em;
+      color: gray;
+    }
+    .edit-button, .delete-button {
+      margin-left: 10px;
+      cursor: pointer;
+      color: blue;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chat de Soporte Técnico</h1>
+  <ul id="messages"></ul>
+  <form id="form" action="">
+    <input id="input" placeholder="Escribe un mensaje..." autocomplete="off" /><button>Enviar</button>
+  </form>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    var socket = io();
+    var form = document.getElementById('form');
+    var input = document.getElementById('input');
+    var username;
+    var colors = {};
+
+    function getRandomColor() {
+      var letters = '0123456789ABCDEF';
+      var color = '#';
+      for (var i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    function authenticate() {
+      var token = prompt("Por favor, introduce tu token de autenticación:");
+      if (token === "token12345") {
+        username = prompt("Por favor, introduce tu nombre de usuario:");
+        if (!colors[username]) {
+          colors[username] = getRandomColor();
+        }
+      } else {
+        alert("Token incorrecto. Inténtalo de nuevo.");
+        authenticate();
+      }
+    }
+
+    authenticate();
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (input.value && username) {
+        socket.emit('chat message', { username: username, text: input.value, color: colors[username], time: new Date().toLocaleTimeString() });
+        input.value = '';
+      }
+    });
+
+    socket.on('chat message', function(msg) {
+      var item = document.createElement('li');
+      item.className = 'message';
+      item.style.borderBottomColor = msg.color;
+
+      var usernameSpan = document.createElement('span');
+      usernameSpan.className = 'username';
+      usernameSpan.textContent = msg.username;
+
+      var timestampSpan = document.createElement('span');
+      timestampSpan.className = 'timestamp';
+      timestampSpan.textContent = ` [${msg.time}]`;
+
+      var messageText = document.createElement('div');
+      messageText.textContent = msg.text;
+
+      var editButton = document.createElement('span');
+      editButton.className = 'edit-button';
+      editButton.textContent = 'Editar';
+      editButton.onclick = function() {
+        var newText = prompt("Edita tu mensaje:", msg.text);
+        if (newText) {
+          socket.emit('edit message', { id: msg.id, text: newText });
+        }
+      };
+
+      var deleteButton = document.createElement('span');
+      deleteButton.className = 'delete-button';
+      deleteButton.textContent = 'Eliminar';
+      deleteButton.onclick = function() {
+        if (confirm("¿Estás seguro de que deseas eliminar este mensaje?")) {
+          socket.emit('delete message', msg.id);
+        }
+      };
+
+      item.appendChild(usernameSpan);
+      item.appendChild(timestampSpan);
+      item.appendChild(messageText);
+      item.appendChild(editButton);
+      item.appendChild(deleteButton);
+
+      document.getElementById('messages').appendChild(item);
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    socket.on('edit message', function(msg) {
+      var items = document.getElementsByClassName('message');
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].querySelector('.username').textContent === msg.username && items[i].querySelector('.timestamp').textContent.includes(msg.time)) {
+          items[i].querySelector('div').textContent = msg.text;
+          break;
+        }
+      }
+    });
+
+    socket.on('delete message', function(id) {
+      var items = document.getElementsByClassName('message');
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].querySelector('.delete-button').onclick.toString().includes(id)) {
+          items[i].remove();
+          break;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
